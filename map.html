@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sankofa — Accra zone map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, system-ui, sans-serif; }
+    #map { position: absolute; top: 44px; left: 0; right: 0; bottom: 0; }
+    header {
+      position: absolute; top: 0; left: 0; right: 0; height: 44px;
+      background: #0f3d2e; color: #fff; display: flex; align-items: center;
+      padding: 0 1rem; z-index: 1000;
+    }
+    header h1 { font-size: 0.95rem; margin: 0; font-weight: 600; }
+    header .updated { margin-left: auto; font-size: 0.8rem; opacity: 0.75; }
+    .legend {
+      background: #fff; padding: 8px 10px; border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2); font-size: 0.78rem; line-height: 1.6;
+    }
+    .legend .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .label { font-size: 0.72rem; font-weight: 600; color: #222; text-shadow: 0 0 3px #fff, 0 0 3px #fff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sankofa — Accra zones</h1>
+    <span class="updated" id="updated"></span>
+  </header>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    // ── data ─────────────────────────────────────────────────────────────
+    // Generated payload — replace this block to refresh. See tools/render_map.py.
+    const PAYLOAD = {
+      "generated_at": "2026-06-17T21:00:00Z",
+      "zones": [
+        {
+          "name": "East Legon",
+          "lat": 5.6667,
+          "lng": -0.1476,
+          "state": "CLEAR",
+          "intensity_mm_hr": 0.0,
+          "temp_c": 27.1
+        },
+        {
+          "name": "Adenta",
+          "lat": 5.7212,
+          "lng": -0.1484,
+          "state": "RAINING_LIGHT",
+          "intensity_mm_hr": 0.6,
+          "temp_c": 25.4
+        },
+        {
+          "name": "Community 25",
+          "lat": 5.7467,
+          "lng": 0.0501,
+          "state": "CLEAR",
+          "intensity_mm_hr": 0.0,
+          "temp_c": 27.8
+        },
+        {
+          "name": "Cantonments",
+          "lat": 5.5712,
+          "lng": -0.179,
+          "state": "RAINING_MODERATE",
+          "intensity_mm_hr": 2.1,
+          "temp_c": 24.9
+        },
+        {
+          "name": "Dzorwulu",
+          "lat": 5.6053,
+          "lng": -0.2005,
+          "state": "DRIZZLE",
+          "intensity_mm_hr": 0.2,
+          "temp_c": 26.0
+        },
+        {
+          "name": "Achimota",
+          "lat": 5.6397,
+          "lng": -0.2454,
+          "state": "CLEAR",
+          "intensity_mm_hr": 0.0,
+          "temp_c": 27.3
+        },
+        {
+          "name": "Westlands",
+          "lat": 5.6667,
+          "lng": -0.2002,
+          "state": "CLEAR",
+          "intensity_mm_hr": 0.0,
+          "temp_c": 27.0
+        },
+        {
+          "name": "Kwabenya-Ashongman",
+          "lat": 5.6951,
+          "lng": -0.2569,
+          "state": "LIKELY",
+          "intensity_mm_hr": null,
+          "temp_c": 26.6
+        },
+        {
+          "name": "Industrial Area",
+          "lat": 5.5722,
+          "lng": -0.2222,
+          "state": "CLEARING",
+          "intensity_mm_hr": 0.1,
+          "temp_c": 26.2
+        },
+        {
+          "name": "Industrial Area II",
+          "lat": 5.5575,
+          "lng": -0.2621,
+          "state": "CLEAR",
+          "intensity_mm_hr": 0.0,
+          "temp_c": 27.5
+        },
+        {
+          "name": "Kwashieman-Ablekuma",
+          "lat": 5.6303,
+          "lng": -0.2984,
+          "state": "CLEAR",
+          "intensity_mm_hr": 0.0,
+          "temp_c": 27.6
+        },
+        {
+          "name": "Spintex",
+          "lat": 5.6203,
+          "lng": -0.0958,
+          "state": "RAINING_HEAVY",
+          "intensity_mm_hr": 5.4,
+          "temp_c": 24.3
+        },
+        {
+          "name": "Tema Main",
+          "lat": 5.6525,
+          "lng": -0.017,
+          "state": "RAINING_LIGHT",
+          "intensity_mm_hr": 0.8,
+          "temp_c": 25.1
+        },
+        {
+          "name": "Weija-Gbawe",
+          "lat": 5.5631,
+          "lng": -0.3144,
+          "state": "CLEAR",
+          "intensity_mm_hr": 0.0,
+          "temp_c": 27.9
+        }
+      ]
+    };
+
+    // ── state → colour ───────────────────────────────────────────────────
+    const STATE_COLOURS = {
+      "CLEAR":               "#2ca25f",
+      "CLEARING":            "#a1d99b",
+      "LIKELY":              "#fde0a3",
+      "DRIZZLE":             "#9ecae1",
+      "RAINING_LIGHT":       "#6baed6",
+      "RAINING_MODERATE":    "#3182bd",
+      "RAINING_HEAVY":       "#08519c",
+      "RAINING_VERY_HEAVY":  "#08306b",
+      "UNKNOWN":             "#bdbdbd"
+    };
+    const STATE_LABELS = {
+      "CLEAR": "Clear", "CLEARING": "Clearing", "LIKELY": "Rain likely",
+      "DRIZZLE": "Drizzle", "RAINING_LIGHT": "Light rain", "RAINING_MODERATE": "Moderate rain",
+      "RAINING_HEAVY": "Heavy rain", "RAINING_VERY_HEAVY": "Very heavy rain",
+      "UNKNOWN": "Unknown"
+    };
+
+    // ── map ──────────────────────────────────────────────────────────────
+    const map = L.map("map", { zoomControl: true }).setView([5.62, -0.18], 11);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors",
+      maxZoom: 18
+    }).addTo(map);
+
+    // markers
+    PAYLOAD.zones.forEach(z => {
+      const colour = STATE_COLOURS[z.state] || STATE_COLOURS.UNKNOWN;
+      const stateLabel = STATE_LABELS[z.state] || z.state;
+      const marker = L.circleMarker([z.lat, z.lng], {
+        radius: 12, color: "#222", weight: 1.5,
+        fillColor: colour, fillOpacity: 0.85
+      }).addTo(map);
+
+      // hover tooltip = zone name; click popup = details
+      marker.bindTooltip(z.name, { permanent: true, direction: "right",
+                                   offset: [12, 0], className: "label", opacity: 0.95 });
+      const intensity = z.intensity_mm_hr != null ? `<br>Intensity: ${z.intensity_mm_hr.toFixed(2)} mm/hr` : "";
+      const temp = z.temp_c != null ? `<br>Temp: ${z.temp_c.toFixed(1)} °C` : "";
+      marker.bindPopup(
+        `<strong>${z.name}</strong><br>` +
+        `State: ${stateLabel}` + intensity + temp
+      );
+    });
+
+    // ── legend ───────────────────────────────────────────────────────────
+    const legend = L.control({ position: "bottomright" });
+    legend.onAdd = function () {
+      const div = L.DomUtil.create("div", "legend");
+      const order = ["CLEAR","CLEARING","LIKELY","DRIZZLE","RAINING_LIGHT","RAINING_MODERATE","RAINING_HEAVY","RAINING_VERY_HEAVY","UNKNOWN"];
+      div.innerHTML = "<strong>Rain state</strong><br>" + order.map(s =>
+        `<span class="swatch" style="background:${STATE_COLOURS[s]}"></span>${STATE_LABELS[s]}`
+      ).join("<br>");
+      return div;
+    };
+    legend.addTo(map);
+
+    // ── timestamp ────────────────────────────────────────────────────────
+    document.getElementById("updated").textContent =
+      "Updated " + PAYLOAD.generated_at.replace("T", " ").replace("Z", " UTC");
+  </script>
+</body>
+</html>
