@@ -32,7 +32,7 @@
   <div id="map"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script type="module">
+  <script>
     // ── data ─────────────────────────────────────────────────────────────
     // Generated payload — replace this block to refresh. See tools/render_map.py.
     const PAYLOAD = {
@@ -179,37 +179,27 @@
       maxZoom: 18
     }).addTo(map);
 
-    // ── voronoi cell borders (catchment per zone) ────────────────────────
-    // Coordinates only — no admin polygons exist for these informal zones,
-    // so each cell = "all points closer to this centroid than any other",
-    // clipped to an Accra metro bbox (just outside the outermost zone
-    // centroids, ~3 km buffer). Cells are colour-coded by zone IDENTITY so
-    // adjacent cities are always visually distinct — weather state lives
-    // on the centre marker instead.
-    const { Delaunay } = await import("https://cdn.jsdelivr.net/npm/d3-delaunay@6/+esm");
-    const BBOX = { south: 5.52, north: 5.78, west: -0.34, east: 0.08 };
-
-    // 14 visually distinct categorical colours (d3-schemeCategory + Pastel
-    // greens/oranges to keep blue free for the rain markers).
+    // ── per-zone catchment circles ───────────────────────────────────────
+    // We only have one centroid per zone — no polygon data. Voronoi
+    // partitioning sprawled peripheral zones (Kwabenya-Ashongman, Community
+    // 25, Weija-Gbawe) far beyond their actual coverage because nothing
+    // bounded them on the outer side. A fixed-radius circle around each
+    // exact centroid is the honest read: this is where the zone sits, this
+    // is the rough area it serves, no inferred boundary. ZONE_RADIUS_M
+    // matches the typical Accra ops zone catchment (~2.5 km).
+    const ZONE_RADIUS_M = 2500;
     const ZONE_COLOURS = [
       "#e6194B", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
       "#911eb4", "#42d4f4", "#f032e6", "#bfef45", "#fabed4",
       "#469990", "#dcbeff", "#9A6324", "#800000",
     ];
 
-    const points = PAYLOAD.zones.map(z => [z.lng, z.lat]);
-    const voronoi = Delaunay.from(points).voronoi(
-      [BBOX.west, BBOX.south, BBOX.east, BBOX.north]
-    );
-
     PAYLOAD.zones.forEach((z, i) => {
-      const cell = voronoi.cellPolygon(i);
-      if (!cell) return;
-      const latlngs = cell.map(([lng, lat]) => [lat, lng]);
       const zoneColour = ZONE_COLOURS[i % ZONE_COLOURS.length];
-      L.polygon(latlngs, {
+      L.circle([z.lat, z.lng], {
+        radius: ZONE_RADIUS_M,
         color: zoneColour, weight: 2.5, opacity: 0.9,
-        fillColor: zoneColour, fillOpacity: 0.18,
+        fillColor: zoneColour, fillOpacity: 0.22,
         interactive: false   // markers handle clicks
       }).addTo(map);
     });
