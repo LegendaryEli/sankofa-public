@@ -179,14 +179,24 @@
       maxZoom: 18
     }).addTo(map);
 
-    // ── voronoi cell borders (centroid-based catchment per zone) ─────────
+    // ── voronoi cell borders (catchment per zone) ────────────────────────
     // Coordinates only — no admin polygons exist for these informal zones,
     // so each cell = "all points closer to this centroid than any other",
-    // clipped to a Greater Accra bounding box. Borders are auto-drawn
-    // between adjacent zones. For Accra-scale areas the lng/lat → x/y
-    // distortion is small enough to treat as flat.
+    // clipped to an Accra metro bbox (just outside the outermost zone
+    // centroids, ~3 km buffer). Cells are colour-coded by zone IDENTITY so
+    // adjacent cities are always visually distinct — weather state lives
+    // on the centre marker instead.
     const { Delaunay } = await import("https://cdn.jsdelivr.net/npm/d3-delaunay@6/+esm");
-    const BBOX = { south: 5.46, north: 5.82, west: -0.40, east: 0.12 };
+    const BBOX = { south: 5.52, north: 5.78, west: -0.34, east: 0.08 };
+
+    // 14 visually distinct categorical colours (d3-schemeCategory + Pastel
+    // greens/oranges to keep blue free for the rain markers).
+    const ZONE_COLOURS = [
+      "#e6194B", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
+      "#911eb4", "#42d4f4", "#f032e6", "#bfef45", "#fabed4",
+      "#469990", "#dcbeff", "#9A6324", "#800000",
+    ];
+
     const points = PAYLOAD.zones.map(z => [z.lng, z.lat]);
     const voronoi = Delaunay.from(points).voronoi(
       [BBOX.west, BBOX.south, BBOX.east, BBOX.north]
@@ -196,10 +206,10 @@
       const cell = voronoi.cellPolygon(i);
       if (!cell) return;
       const latlngs = cell.map(([lng, lat]) => [lat, lng]);
-      const colour = STATE_COLOURS[z.state] || STATE_COLOURS.UNKNOWN;
+      const zoneColour = ZONE_COLOURS[i % ZONE_COLOURS.length];
       L.polygon(latlngs, {
-        color: "#444", weight: 1, opacity: 0.6,
-        fillColor: colour, fillOpacity: 0.28,
+        color: zoneColour, weight: 2.5, opacity: 0.9,
+        fillColor: zoneColour, fillOpacity: 0.18,
         interactive: false   // markers handle clicks
       }).addTo(map);
     });
@@ -225,13 +235,21 @@
     });
 
     // ── legend ───────────────────────────────────────────────────────────
+    // Two legends: rain state (the marker dot colours) on the bottom-right,
+    // because that's the operationally-meaningful read at a glance. Cells
+    // are colour-coded by zone identity (categorical) — that's just for
+    // visual separation; their colour has no semantic meaning beyond
+    // "different from the cell next to it".
     const legend = L.control({ position: "bottomright" });
     legend.onAdd = function () {
       const div = L.DomUtil.create("div", "legend");
       const order = ["CLEAR","CLEARING","LIKELY","DRIZZLE","RAINING_LIGHT","RAINING_MODERATE","RAINING_HEAVY","RAINING_VERY_HEAVY","UNKNOWN"];
-      div.innerHTML = "<strong>Rain state</strong><br>" + order.map(s =>
-        `<span class="swatch" style="background:${STATE_COLOURS[s]}"></span>${STATE_LABELS[s]}`
-      ).join("<br>");
+      div.innerHTML =
+        "<strong>Rain state</strong> (dot)<br>" +
+        order.map(s =>
+          `<span class="swatch" style="background:${STATE_COLOURS[s]}"></span>${STATE_LABELS[s]}`
+        ).join("<br>") +
+        "<br><br><em style=\"color:#666;font-size:0.72rem\">Cell colours separate zones &mdash; no weather meaning.</em>";
       return div;
     };
     legend.addTo(map);
